@@ -1,0 +1,14 @@
+{
+  "synergyRoutes" : [
+    {
+      "eventName" : "event1",
+      "eventVersion" : 1,
+      "dispatchTopics" : ["syntest-sayhello", "syntest1"]
+    },
+    {
+      "eventName" : "event1",
+      "eventVersion" : 1,
+      "dispatchTopics" : ["syntest-sayhello", "syntest1"]
+    }
+  ]
+}
