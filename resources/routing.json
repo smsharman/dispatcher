@@ -1,14 +1,20 @@
 {
-  "synergyRoutes" : [
+  "synergyRoutes":
     {
-      "eventName" : "event1",
-      "eventVersion" : 1,
-      "dispatchTopics" : ["syntest-sayhello", "syntest1"]
-    },
-    {
-      "eventName" : "event1",
-      "eventVersion" : 1,
-      "dispatchTopics" : ["syntest-sayhello", "syntest1"]
+      "event1_1": {
+        "eventName": "event1",
+        "eventVersion": 1,
+        "dispatchTopics": [
+          "syntest-sayhello",
+          "syntest1"
+        ]
+      },
+      "event2_1": {
+        "eventName": "event2",
+        "eventVersion": 1,
+        "dispatchTopics": [
+          "syntest-sayhello"
+        ]
+      }
     }
-  ]
 }
