@@ -10,7 +10,7 @@
                  [com.taoensso/timbre "4.10.0"]
                  [danlentz/clj-uuid "0.1.7"]
                  [clj-time "0.13.0"]
-                 [synergy-specs "0.1.5"]
+                 [synergy-specs "0.1.6"]
                  [com.cognitect.aws/api "0.8.456"]
                  [com.cognitect.aws/endpoints "1.1.11.753"]
                  [com.cognitect.aws/s3 "784.2.593.0"]

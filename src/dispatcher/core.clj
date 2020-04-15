@@ -67,67 +67,49 @@
                                                :request {:Bucket tableBucket :Key tableFilename}}) :Body)) :key-fn keyword)]
     (swap! routeTable merge @routeTable rawRouteMap)))
 
-
-
-;; Valid message, namespaced keys
+;; Valid message
 (def testMessage1 {
-                   :synergy-specs.events/eventId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/parentId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/originId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/userId "1"
-                   :synergy-specs.events/orgId "1"
-                   :synergy-specs.events/eventVersion 1
-                   :synergy-specs.events/eventAction "event1"
-                   :synergy-specs.events/eventData {
-                                                    :key1 "value1"
-                                                    :key2 "value2"
-                                                    }
-                   :synergy-specs.events/eventTimestamp "2018-10-09T12:24:03.390+0000"
-                   })
-
-;; Invalid message - keys not namespaced
-(def testMessage2 {
-                   :eventId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :parentId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :originId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :userId "1"
-                   :orgId "1"
-                   :eventVersion 1
-                   :eventAction "event1"
-                   :eventData {
-                                                    :key1 "value1"
-                                                    :key2 "value2"
-                                                    }
-                   :synergy-specs.events/eventTimestamp "2018-10-09T12:24:03.390+0000"
+                   :eventId        "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :parentId       "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :originId       "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :userId         "1"
+                   :orgId          "1"
+                   :eventVersion   1
+                   :eventAction    "event1"
+                   :eventData      {
+                                    :key1 "value1"
+                                    :key2 "value2"
+                                    }
+                   :eventTimestamp "2018-10-09T12:24:03.390+0000"
                    })
 
 ;; Invalid message - missing keys
-(def testMessage3 {
-                   :synergy-specs.events/eventId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/parentId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/originId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/eventAction "event1"
-                   :synergy-specs.events/eventData {
-                                                    :key1 "value1"
-                                                    :key2 "value2"
-                                                    }
-                   :synergy-specs.events/eventTimestamp "2018-10-09T12:24:03.390+0000"
+(def testMessage2 {
+                   :eventId        "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :parentId       "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :originId       "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :eventAction    "event1"
+                   :eventData      {
+                                    :key1 "value1"
+                                    :key2 "value2"
+                                    }
+                   :eventTimestamp "2018-10-09T12:24:03.390+0000"
                    })
 
 ;; Invalid message - unknown version number
-(def testMessage4 {
-                   :synergy-specs.events/eventId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/parentId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/originId "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
-                   :synergy-specs.events/userId "1"
-                   :synergy-specs.events/orgId "1"
-                   :synergy-specs.events/eventVersion 2
-                   :synergy-specs.events/eventAction "event1"
-                   :synergy-specs.events/eventData {
-                                                    :key1 "value1"
-                                                    :key2 "value2"
-                                                    }
-                   :synergy-specs.events/eventTimestamp "2018-10-09T12:24:03.390+0000"
+(def testMessage3 {
+                   :eventId        "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :parentId       "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :originId       "7a5a815b-2e52-4d40-bec8-c3fc06edeb36"
+                   :userId         "1"
+                   :orgId          "1"
+                   :eventVersion   2
+                   :eventAction    "event1"
+                   :eventData      {
+                                    :key1 "value1"
+                                    :key2 "value2"
+                                    }
+                   :eventTimestamp "2018-10-09T12:24:03.390+0000"
                    })
 
 (defn gen-status-map
@@ -165,17 +147,38 @@
       (gen-status-map false "route-table-entry-not-present" {:eventId eventId :eventAction eventAction :eventVersion eventVersion :eventLookup eventLookup})
       (gen-status-map true "route-table-entry-found" {:topics eventTopics}))))
 
-;; TODO: complete this function to dispatch off to the event-store (add keys in SSM for this)
 (defn dispatch-to-event-store [event note]
   "Dispatch a given event to the event store SNS topic"
-  (let [thisEventId (get event ::synspec/eventId)]
-    (info "Dispatching event to event store topic : " @eventStoreTopic " (" note ") : " event)
-    (gen-status-map true "dispatched-to-event-store" {:eventId thisEventId})))
+  (let [thisEventId (get event ::synspec/eventId)
+        jsonEvent (json/write-str event)
+        eventSNS (str @snsArnPrefix @eventStoreTopic)
+        snsSendResult (aws/invoke sns {:op :Publish :request {:TopicArn eventSNS
+                                                              :Message  jsonEvent}})]
+    (if (nil? (get snsSendResult :MessageId))
+      (do
+        (info "Error dispatching event to event store topic : " eventSNS " (" note ") : " event)
+        (gen-status-map false "dispatched-to-event-store" {:eventId thisEventId
+                                                          :error   snsSendResult}))
+      (do
+        (info "Dispatching event to event store topic : " eventSNS " (" note ") : " event)
+        (gen-status-map true "dispatched-to-event-store" {:eventId thisEventId
+                                                          :messageId (get snsSendResult :MessageId)})))))
 
 ;; TODO: complete this function to dispatch off to the given SNS queues, also to the event-store, add error handling
 (defn dispatch-event [event topics]
-  (dispatch-to-event-store event "Dispatched to topics")
-  (info "Dispatching event : " (get event ::synspec/eventId) " to topics : " topics))
+  (dispatch-to-event-store event "Dispatching to topics")
+  (doseq [topic topics]
+    (let [thisEventId (get event ::synspec/eventId)
+          jsonEvent (json/write-str event)
+          eventSNS (str @snsArnPrefix topic)
+          snsSendResult (aws/invoke sns {:op :Publish :request {:TopicArn eventSNS
+                                                                :Message  jsonEvent}})]
+      (if (nil? (get snsSendResult :MessageId))
+        (do
+          (info "Error dispatching event to destination topic : " eventSNS " : " event))
+        (do
+          (info "Dispatching event to destination topic : " eventSNS " : " event)))))
+  (gen-status-map true "event-dispatched" {}))
 
 (defn route-event [event]
   "Route an inbound event to a given set of destination topics"
@@ -189,12 +192,11 @@
           (dispatch-to-event-store event "No routing topic")))
       (dispatch-to-event-store event (str "Event not valid : " (get validateEvent :return-value))))))
 
-;; //TODO: replace this with route-event (as above)
 (defn handle-event
   [event]
-  (let [eventaction (get event :eventAction)]
-    (println "Got the following event : " (print-str event))
-    (println "eventAction is: " eventaction)
+  (let [nsevent (synergy-specs.events/wrap-std-event event)]
+    (info "Received the following event : " (print-str nsevent))
+    (route-event nsevent)
     (generate-lambda-return 200 "ok")))
 
 (deflambdafn dispatcher.core.Route
