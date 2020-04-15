@@ -147,38 +147,33 @@
       (gen-status-map false "route-table-entry-not-present" {:eventId eventId :eventAction eventAction :eventVersion eventVersion :eventLookup eventLookup})
       (gen-status-map true "route-table-entry-found" {:topics eventTopics}))))
 
-(defn dispatch-to-event-store [event note]
-  "Dispatch a given event to the event store SNS topic"
-  (let [thisEventId (get event ::synspec/eventId)
-        jsonEvent (json/write-str event)
-        eventSNS (str @snsArnPrefix @eventStoreTopic)
-        snsSendResult (aws/invoke sns {:op :Publish :request {:TopicArn eventSNS
-                                                              :Message  jsonEvent}})]
-    (if (nil? (get snsSendResult :MessageId))
-      (do
-        (info "Error dispatching event to event store topic : " eventSNS " (" note ") : " event)
-        (gen-status-map false "dispatched-to-event-store" {:eventId thisEventId
-                                                          :error   snsSendResult}))
-      (do
-        (info "Dispatching event to event store topic : " eventSNS " (" note ") : " event)
-        (gen-status-map true "dispatched-to-event-store" {:eventId thisEventId
-                                                          :messageId (get snsSendResult :MessageId)})))))
 
-;; TODO: complete this function to dispatch off to the given SNS queues, also to the event-store, add error handling
+(defn send-to-topic
+  ([thisTopic thisEvent]
+   (send-to-topic thisTopic thisEvent ""))
+  ([topic event note]
+   (let [thisEventId (get event ::synspec/eventId)
+         jsonEvent (json/write-str event)
+         eventSNS (str @snsArnPrefix topic)
+         snsSendResult (aws/invoke sns {:op :Publish :request {:TopicArn eventSNS
+                                                               :Message  jsonEvent}})]
+     (if (nil? (get snsSendResult :MessageId))
+       (do
+         (info "Error dispatching event to topic : " topic " (" note ") : " event)
+         (gen-status-map false "error-dispatching-to-topic" {:eventId thisEventId
+                                                             :error snsSendResult}))
+       (do
+         (info "Dispatching event to topic : " eventSNS " (" note ") : " event)
+         (gen-status-map true "dispatched-to-topic" {:eventId   thisEventId
+                                                     :messageId (get snsSendResult :MessageId)}))))))
+
+
 (defn dispatch-event [event topics]
-  (dispatch-to-event-store event "Dispatching to topics")
+  (send-to-topic @eventStoreTopic event "Dispatching to topics")
   (doseq [topic topics]
-    (let [thisEventId (get event ::synspec/eventId)
-          jsonEvent (json/write-str event)
-          eventSNS (str @snsArnPrefix topic)
-          snsSendResult (aws/invoke sns {:op :Publish :request {:TopicArn eventSNS
-                                                                :Message  jsonEvent}})]
-      (if (nil? (get snsSendResult :MessageId))
-        (do
-          (info "Error dispatching event to destination topic : " eventSNS " : " event))
-        (do
-          (info "Dispatching event to destination topic : " eventSNS " : " event)))))
-  (gen-status-map true "event-dispatched" {}))
+    (send-to-topic topic event "")))
+  (gen-status-map true "event-dispatched" {})
+
 
 (defn route-event [event]
   "Route an inbound event to a given set of destination topics"
@@ -189,8 +184,9 @@
       (let [routeTableEntries (get-route-table-entries event)]
         (if (true? (get routeTableEntries :status))
           (dispatch-event event (get-in routeTableEntries [:return-value :topics]))
-          (dispatch-to-event-store event "No routing topic")))
-      (dispatch-to-event-store event (str "Event not valid : " (get validateEvent :return-value))))))
+          (send-to-topic @eventStoreTopic event "No routing topic")))
+      (send-to-topic @eventStoreTopic event (str "Event not valid : " (get validateEvent :return-value))))))
+
 
 (defn handle-event
   [event]
