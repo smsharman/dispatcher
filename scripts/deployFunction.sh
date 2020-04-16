@@ -5,7 +5,7 @@ aws lambda create-function \
     --zip-file fileb://$(pwd)/../target/synergy-dispatcher.jar \
     --role arn:aws:iam::979590819078:role/syn-evt-lambda \
     --handler dispatcher.core.Route \
-    --runtime java8 \
+    --runtime java11 \
     --timeout 15 \
     --memory-size 1024 \
     --cli-connect-timeout 6000

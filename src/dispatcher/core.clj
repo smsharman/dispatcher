@@ -153,7 +153,7 @@
    (send-to-topic thisTopic thisEvent ""))
   ([topic event note]
    (let [thisEventId (get event ::synspec/eventId)
-         jsonEvent (json/write-str event)
+         jsonEvent (json/write-str (synspec/unwrap-std-event event))
          eventSNS (str @snsArnPrefix topic)
          snsSendResult (aws/invoke sns {:op :Publish :request {:TopicArn eventSNS
                                                                :Message  jsonEvent}})]
@@ -190,7 +190,8 @@
 
 (defn handle-event
   [event]
-  (let [nsevent (synergy-specs.events/wrap-std-event event)]
+  (let [cevent (json/read-str (get (get (first (get event :Records)) :Sns) :Message) :key-fn keyword)
+        nsevent (synspec/wrap-std-event cevent)]
     (info "Received the following event : " (print-str nsevent))
     (route-event nsevent)
     (generate-lambda-return 200 "ok")))

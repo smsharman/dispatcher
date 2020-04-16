@@ -5,15 +5,14 @@
         "eventName": "event1",
         "eventVersion": 1,
         "dispatchTopics": [
-          "syntest-sayhello",
-          "syntest1"
+          "testEventHandlerTopic"
         ]
       },
       "event2_1": {
         "eventName": "event2",
         "eventVersion": 1,
         "dispatchTopics": [
-          "syntest-sayhello"
+          "testEventHandlerTopic"
         ]
       }
     }
