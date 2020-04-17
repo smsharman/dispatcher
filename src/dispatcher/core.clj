@@ -80,7 +80,7 @@
                                     :key1 "value1"
                                     :key2 "value2"
                                     }
-                   :eventTimestamp "2018-10-09T12:24:03.390+0000"
+                   :eventTimestamp "2020-04-17T11:23:10.904Z"
                    })
 
 ;; Invalid message - missing keys
@@ -93,7 +93,7 @@
                                     :key1 "value1"
                                     :key2 "value2"
                                     }
-                   :eventTimestamp "2018-10-09T12:24:03.390+0000"
+                   :eventTimestamp "2020-04-17T11:23:10.904Z"
                    })
 
 ;; Invalid message - unknown version number
@@ -109,7 +109,7 @@
                                     :key1 "value1"
                                     :key2 "value2"
                                     }
-                   :eventTimestamp "2018-10-09T12:24:03.390+0000"
+                   :eventTimestamp "2020-04-17T11:23:10.904Z"
                    })
 
 (defn gen-status-map
