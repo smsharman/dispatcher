@@ -5,6 +5,7 @@
             [cognitect.aws.client.api :as aws]
             [synergy-specs.events :as synspec]
             [clojure.spec.alpha :as s]
+            [synergy-events-stdlib.core :as stdlib]
             [taoensso.timbre :as timbre
              :refer [log trace debug info warn error fatal report
                      logf tracef debugf infof warnf errorf fatalf reportf
@@ -18,54 +19,11 @@
 
 (def sns (aws/client {:api :sns}))
 
-(def routeTableParameters {
-                           :bucket "synergyDispatchBucket"
-                           :filename "synergyDispatchRoutingTable"
-                           :arn-prefix "synergyDispatchTopicArnRoot"
-                           :event-store-topic "synergyEventStoreTopic"
-                          })
-
 (def routeTable (atom {}))
 
 (def snsArnPrefix (atom ""))
 
 (def eventStoreTopic (atom ""))
-
-(defn getRouteTableParametersFromSSM []
-  "Look up values in the SSM parameter store to be later used by the routing table"
-  (let [tableBucket (get-in (aws/invoke ssm {:op :GetParameter
-                                                             :request {:Name (get routeTableParameters :bucket)}})
-                            [:Parameter :Value])
-        tableFilename (get-in (aws/invoke ssm {:op :GetParameter
-                                                               :request {:Name (get routeTableParameters :filename)}})
-                            [:Parameter :Value])
-        snsPrefix (get-in (aws/invoke ssm {:op :GetParameter
-                                                           :request {:Name (get routeTableParameters :arn-prefix)}})
-                            [:Parameter :Value])
-        evStoreTopic (get-in (aws/invoke ssm {:op :GetParameter
-                                           :request {:Name (get routeTableParameters :event-store-topic)}})
-                          [:Parameter :Value])
-        ]
-    ;; //TODO: add error handling so if for any reason we can't get the values, this is noted
-    {:tableBucket tableBucket :tableFilename tableFilename :snsPrefix snsPrefix :eventStoreTopic evStoreTopic}))
-
-(defn setEventStoreTopic [parameter-map]
-  "Set the eventStoreTopic atom with the required value"
-  (swap! eventStoreTopic str (get parameter-map :eventStoreTopic)))
-
-(defn setArnPrefix [parameter-map]
-  "Set the snsArnPrefix atom with the required value"
-  (swap! snsArnPrefix str (get parameter-map :snsPrefix)))
-
-(defn loadRouteTable [parameter-map]
-  "Load routing table from S3, input is a map with :tableBucket :tableFilename and :snsPrefix"
-  ;; Get file from S3 and turn it into a map
-  (let [tableBucket (get parameter-map :tableBucket)
-        tableFilename (get parameter-map :tableFilename)
-        rawRouteMap (json/read (io/reader
-                                 (get (aws/invoke s3 {:op :GetObject
-                                               :request {:Bucket tableBucket :Key tableFilename}}) :Body)) :key-fn keyword)]
-    (swap! routeTable merge @routeTable rawRouteMap)))
 
 ;; Valid message
 (def testMessage1 {
@@ -112,30 +70,6 @@
                    :eventTimestamp "2020-04-17T11:23:10.904Z"
                    })
 
-(defn gen-status-map
-  "Generate a status map from the values provided"
-  [status-code status-message return-value]
-  (let [return-status-map {:status status-code :description status-message :return-value return-value}]
-    return-status-map))
-
-(defn generate-lambda-return [statuscode message]
-  "Generate a simple Lambda status return"
-  {:status statuscode :message message})
-
-(defn validate-message [inbound-message]
-  (if (s/valid? ::synspec/synergyEvent inbound-message)
-    (gen-status-map true "valid-inbound-message" {})
-    (gen-status-map false "invalid-inbound-message" (s/explain-data ::synspec/synergyEvent inbound-message))))
-
-(defn set-up-route-table []
-  (reset! routeTable {})
-  (reset! snsArnPrefix "")
-  (reset! eventStoreTopic "")
-  (info "Routing table not found - setting up (probably first run for this Lambda instance")
-  (let [route-paraneters (getRouteTableParametersFromSSM)]
-    (setArnPrefix route-paraneters)
-    (setEventStoreTopic route-paraneters)
-    (loadRouteTable route-paraneters)))
 
 (defn get-route-table-entries [event]
   (let [eventAction (get event ::synspec/eventAction)
@@ -144,48 +78,30 @@
         eventLookup (str eventAction "_" eventVersion)
         eventTopics (get-in @routeTable [:synergyRoutes (keyword eventLookup) :dispatchTopics])]
     (if (nil? eventTopics)
-      (gen-status-map false "route-table-entry-not-present" {:eventId eventId :eventAction eventAction :eventVersion eventVersion :eventLookup eventLookup})
-      (gen-status-map true "route-table-entry-found" {:topics eventTopics}))))
-
-
-(defn send-to-topic
-  ([thisTopic thisEvent]
-   (send-to-topic thisTopic thisEvent ""))
-  ([topic event note]
-   (let [thisEventId (get event ::synspec/eventId)
-         jsonEvent (json/write-str (synspec/unwrap-std-event event))
-         eventSNS (str @snsArnPrefix topic)
-         snsSendResult (aws/invoke sns {:op :Publish :request {:TopicArn eventSNS
-                                                               :Message  jsonEvent}})]
-     (if (nil? (get snsSendResult :MessageId))
-       (do
-         (info "Error dispatching event to topic : " topic " (" note ") : " event)
-         (gen-status-map false "error-dispatching-to-topic" {:eventId thisEventId
-                                                             :error snsSendResult}))
-       (do
-         (info "Dispatching event to topic : " eventSNS " (" note ") : " event)
-         (gen-status-map true "dispatched-to-topic" {:eventId   thisEventId
-                                                     :messageId (get snsSendResult :MessageId)}))))))
+      (stdlib/gen-status-map false "route-table-entry-not-present" {:eventId eventId :eventAction eventAction :eventVersion eventVersion :eventLookup eventLookup})
+      (stdlib/gen-status-map true "route-table-entry-found" {:topics eventTopics}))))
 
 
 (defn dispatch-event [event topics]
-  (send-to-topic @eventStoreTopic event "Dispatching to topics")
+  (stdlib/send-to-topic @eventStoreTopic event @snsArnPrefix sns "Dispatching to topics")
   (doseq [topic topics]
-    (send-to-topic topic event "")))
-  (gen-status-map true "event-dispatched" {})
+    (stdlib/send-to-topic topic event @snsArnPrefix sns)))
+  (stdlib/gen-status-map true "event-dispatched" {})
 
 
 (defn route-event [event]
   "Route an inbound event to a given set of destination topics"
   (if (empty? @routeTable)
-    (set-up-route-table))
-  (let [validateEvent (validate-message event)]
+    (do
+    (stdlib/set-up-route-table routeTable ssm s3)
+    (stdlib/set-up-topic-table snsArnPrefix eventStoreTopic ssm)))
+  (let [validateEvent (stdlib/validate-message event)]
     (if (true? (get validateEvent :status))
       (let [routeTableEntries (get-route-table-entries event)]
         (if (true? (get routeTableEntries :status))
           (dispatch-event event (get-in routeTableEntries [:return-value :topics]))
-          (send-to-topic @eventStoreTopic event "No routing topic")))
-      (send-to-topic @eventStoreTopic event (str "Event not valid : " (get validateEvent :return-value))))))
+          (stdlib/send-to-topic @eventStoreTopic event @snsArnPrefix sns "No routing topic")))
+      (stdlib/send-to-topic @eventStoreTopic event @snsArnPrefix sns (str "Event not valid : " (get validateEvent :return-value))))))
 
 
 (defn handle-event
@@ -194,7 +110,7 @@
         nsevent (synspec/wrap-std-event cevent)]
     (info "Received the following event : " (print-str nsevent))
     (route-event nsevent)
-    (generate-lambda-return 200 "ok")))
+    (stdlib/generate-lambda-return 200 "ok")))
 
 (deflambdafn dispatcher.core.Route
              [in out ctx]
